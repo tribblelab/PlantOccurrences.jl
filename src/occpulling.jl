@@ -1,12 +1,4 @@
-using CSV, DataFrames
-using RCall
-using Dates
-
 # needs fileutils.jl (synonym_names, latest_raw_file)
-
-R"""
-library(gatoRs)
-"""
 
 """
     pull_occurrences(synonymdict, raw_dir; kwargs...) -> (successful, no_data, failed)

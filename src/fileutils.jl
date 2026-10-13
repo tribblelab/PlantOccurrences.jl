@@ -1,6 +1,3 @@
-using CSV, DataFrames
-using RCall
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared helpers for finding & loading per-taxon files
 #

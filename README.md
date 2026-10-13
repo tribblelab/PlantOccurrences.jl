@@ -1,18 +1,10 @@
 # PlantOccurrences.jl
 
-## to instantiate Julia pkgs for the first time:
-
-to instantiate / load packages from `\niche_modeling_utils` directory:
-
-`julia --project`
-
-```julia
-using Pkg
-# install the packages listed in the environment
-Pkg.instantiate()
-```
+build a plant name checklist (WCVP / POWO), pull occurrence records for each taxon & its synonyms (GBIF / iDigBio), then clean, georeference & map them.
 
 ## R package dependencies + install
+
+the cleaning, pulling & plotting functions call R (via RCall), so R needs to be installed, along with these packages. they're loaded when the package is, so install them first:
 
 ```R
 packages <- c("gatoRs", "ggplot2", "sf", "ggspatial", "gridExtra", "CoordinateCleaner", "readxl", "dplyr")
@@ -20,16 +12,30 @@ new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(new_packages)) install.packages(new_packages)
 ```
 
-## what's in `scripts/`
+## installing
 
-there's no package (yet), so `include` the files you need. `fileutils.jl` goes first, since the others use it:
+the package isn't registered (yet), so add it from GitHub:
 
 ```julia
-include("niche_modeling_utils/scripts/fileutils.jl")
-include("niche_modeling_utils/scripts/occpulling.jl")
-include("niche_modeling_utils/scripts/datacleaning.jl")
-include("niche_modeling_utils/scripts/plottingutils.jl")
+using Pkg
+Pkg.add(url="https://github.com/tribblelab/PlantOccurrences.jl")
 ```
+
+or, to work on the package itself, clone the repo & start Julia in it with `julia --project`:
+
+```julia
+using Pkg
+# install the packages listed in the environment
+Pkg.instantiate()
+```
+
+then:
+
+```julia
+using PlantOccurrences
+```
+
+## what's in `src/`
 
 | file | functions |
 |---|---|
@@ -49,8 +55,18 @@ the functions expect one file per taxon, named with the taxon (spaces → unders
 a typical run:
 
 ```julia
-# taxon => its synonyms (names, or (name, authority) tuples)
+using PlantOccurrences
+
+# names, synonyms & native ranges for a genus
+checklist = build_checklist("Calceolariaceae", "Calceolaria")
+
+# taxon => its synonyms, as (name, authority) tuples
+taxa = ["Calceolaria alba", "Calceolaria nitida"]
+synonymdict = Dict(t => checklist_synonyms(checklist, t) for t in taxa)
+homonyms_to_exclude = find_homonyms_to_exclude(synonymdict, checklist_homonyms(checklist))
+
 pull_occurrences(synonymdict, "data/pt_occs_raw")
-stats = clean_occurrences(synonymdict, "data/pt_occs_raw", "data/pt_occs_clean", "data/pt_occs_to_georeference")
+stats = clean_occurrences(synonymdict, "data/pt_occs_raw", "data/pt_occs_clean", "data/pt_occs_to_georeference";
+    homonyms_to_exclude = homonyms_to_exclude)
 prepare_geolocate_files("data/pt_occs_to_georeference", "data/pt_occs_to_georeference_geolocate_format")
 ```

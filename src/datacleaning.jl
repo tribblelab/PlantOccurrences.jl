@@ -1,15 +1,4 @@
-using CSV, DataFrames
-using RCall
-
 # needs fileutils.jl (synonym_names, latest_raw_file)
-
-R"""
-library(gatoRs)
-library(ggplot2)
-library(sf)
-library(ggspatial)
-library(dplyr) #needs to be loaded in last, so it defaults to correct `filter` fxn
-"""
 
 """
     find_homonyms_to_exclude(synonymdict, homonyms) -> Dict(taxon => ["name authority", ...])

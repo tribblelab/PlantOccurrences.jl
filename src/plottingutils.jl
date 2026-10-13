@@ -1,14 +1,4 @@
-using CSV, DataFrames
-using RCall
-
 # needs fileutils.jl (load_taxa_data, load_georef_df, latest_raw_file, resolve_clean_file)
-
-R"""
-library(ggplot2)
-library(sf)
-library(ggspatial)
-library(gridExtra)
-"""
 
 """
     load_bot_regions(shapefile_path)

@@ -1,4 +1,4 @@
-"""
+#=
 checklistutils.jl
 
 Builds a plant-name checklist for a given family + genus (or genera), using
@@ -23,16 +23,7 @@ queryable directly. This function reproduces the checklist builder's
     endemic restriction)
   - Format: "Summary Checklist (Names listed by taxonomic status)" --
     accepted names first, then their synonyms grouped underneath.
-"""
-
-#module WCVPChecklist
-
-using HTTP
-using JSON3
-using DataFrames
-using CSV
-
-export build_checklist, ChecklistEntry, to_table, checklist_synonyms, checklist_native_range, checklist_homonyms
+=#
 
 const POWO_SEARCH_URL = "https://powo.science.kew.org/api/1/search"
 const POWO_TAXON_URL  = "https://powo.science.kew.org/api/2/taxon"
@@ -430,10 +421,8 @@ function checklist_homonyms(checklist::AbstractDataFrame)
     return sort!(homonyms, [:scientificName, order(:accepted, rev=true), :authority])
 end
 
-#end # module
-
 # --- Example usage ---
-# include("scripts/checklistutils.jl")
+# using PlantOccurrences
 #
 # # single genus, get a DataFrame:
 # df = build_checklist("Fagaceae", "Quercus")
