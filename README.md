@@ -1,4 +1,4 @@
-# niche_modeling_utils
+# PlantOccurrences.jl
 
 ## to instantiate Julia pkgs for the first time:
 
