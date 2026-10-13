@@ -2,12 +2,14 @@
 
 build a plant name checklist (WCVP / POWO), pull occurrence records for each taxon & its synonyms (GBIF / iDigBio), then clean, georeference & map them.
 
+documentation & a worked example: <https://tribblelab.github.io/PlantOccurrences.jl/dev/>
+
 ## R package dependencies + install
 
 the cleaning, pulling & plotting functions call R (via RCall), so R needs to be installed, along with these packages. they're loaded when the package is, so install them first:
 
 ```R
-packages <- c("gatoRs", "ggplot2", "sf", "ggspatial", "gridExtra", "CoordinateCleaner", "readxl", "dplyr")
+packages <- c("gatoRs", "ggplot2", "sf", "ggspatial", "gridExtra", "readxl", "dplyr")
 new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(new_packages)) install.packages(new_packages)
 ```

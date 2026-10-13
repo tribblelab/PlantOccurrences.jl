@@ -1,11 +1,14 @@
 # needs fileutils.jl (load_taxa_data, load_georef_df, latest_raw_file, resolve_clean_file)
 
+# the TDWG level-3 shapefile that comes with the package (found at call time, so it works wherever the package is installed)
+default_shapefile_path() = joinpath(pkgdir(@__MODULE__), "data", "bot_country_shapefiles", "level3.shp")
+
 """
     load_bot_regions(shapefile_path)
 
 Load TDWG botanical country polygons into R (once, globally).
 """
-function load_bot_regions(shapefile_path="data/bot_country_shapefiles/level3.shp")
+function load_bot_regions(shapefile_path=default_shapefile_path())
     @rput shapefile_path
     R"bot_regions = st_read(shapefile_path, quiet = TRUE)"
 end
@@ -113,7 +116,7 @@ const RPLOT_BLOCK = """
         clean_dir,
         georef_dir,
         filtered_dir   = nothing,
-        shapefile_path = "data/bot_country_shapefiles/level3.shp",
+        shapefile_path = <the TDWG level-3 shapefile that comes with the package>,
         append_date    = true,
         species_ranges_path = nothing)
 
@@ -137,7 +140,7 @@ function plot_species(taxa::String;
     clean_dir::String,
     georef_dir::String,
     filtered_dir::Union{String,Nothing}=nothing,
-    shapefile_path::String="data/bot_country_shapefiles/level3.shp",
+    shapefile_path::String=default_shapefile_path(),
     append_date::Bool=true,
     species_ranges_path::Union{String,Nothing}=nothing,
     only_clean=false,
@@ -187,7 +190,7 @@ end
         georef_dir,
         filtered_dir   = nothing,
         pdf_file,
-        shapefile_path = "data/bot_country_shapefiles/level3.shp",
+        shapefile_path = <the TDWG level-3 shapefile that comes with the package>,
         append_date    = true,
         species_ranges_path = nothing)
 
@@ -202,7 +205,7 @@ function plot_all_occurrence_maps(;
     clean_dir::String,
     georef_dir::String,
     filtered_dir::Union{String,Nothing}=nothing,
-    shapefile_path::String="data/bot_country_shapefiles/level3.shp",
+    shapefile_path::String=default_shapefile_path(),
     pdf_file::String,
     append_date::Bool=true,
     species_ranges_path::Union{String,Nothing}=nothing,

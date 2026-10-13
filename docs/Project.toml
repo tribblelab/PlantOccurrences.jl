@@ -1,0 +1,6 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+PlantOccurrences = "41e93952-0be5-45ed-9935-83314b503f47"
+
+[compat]
+Documenter = "1"
