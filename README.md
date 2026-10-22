@@ -1,12 +1,12 @@
 # PlantOccurrences.jl
 
-build a plant name checklist ([WCVP / POWO](https://powo.science.kew.org/), or [World Flora Online](https://www.worldfloraonline.org/), pull occurrence records for each taxon & its synonyms ([GBIF](https://www.gbif.org/) / [iDigBio](https://idigbio.gbif.us/), then clean, georeference & map them.
+Plant biologists often use publicly available datasets from herbaria to know the temporal + spatial range of their organisms (aka occurrence data). This package interfaces with commonly used databases to build a checklist of currently accepted species names + previously accepted names from [WCVP / POWO](https://powo.science.kew.org/), or [World Flora Online](https://www.worldfloraonline.org/). With those checklists, we can now pull occurrence records for each taxon & its synonyms from [GBIF](https://www.gbif.org/) / [iDigBio](https://idigbio.gbif.us/). With our data in hand, we then clean points & map them.
 
 documentation & a worked example: <https://tribblelab.github.io/PlantOccurrences.jl/dev/>
 
 ## R package dependencies + install
 
-the cleaning, pulling & plotting functions call R (via RCall), so R needs to be installed, along with these packages. they're loaded when the package is, so install them first:
+we make use of existing occurrence pulling/cleaning functions in the package [`gatoRs`](https://nataliepatten.github.io/gatoRs/). we do so via RCall, so R needs to be installed, along with these packages. they're loaded when the package is, so install them first:
 
 ```R
 packages <- c("gatoRs", "ggplot2", "sf", "ggspatial", "gridExtra", "readxl", "dplyr")
@@ -72,3 +72,7 @@ stats = clean_occurrences(synonymdict, "data/pt_occs_raw", "data/pt_occs_clean",
     homonyms_to_exclude = homonyms_to_exclude)
 prepare_geolocate_files("data/pt_occs_to_georeference", "data/pt_occs_to_georeference_geolocate_format")
 ```
+
+## AI usage
+
+This package has been developed with help from Anthropic's Claude (mainly Opus 5.5 model), refactoring code written by the developer for [hyb_niches](https://github.com/tribblelab/hyb_niches) to be generalizable for all plant taxa. All functions/examples have been tested by the developer.
