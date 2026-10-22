@@ -340,20 +340,23 @@ function remove_rows(df::AbstractDataFrame, keep::AbstractVector{Bool}, reason::
 end
 
 """
-    plot_kept_removed(kept_df, removed_df; title="")
-    plot_kept_removed(kept_df, removed::Vector{DataFrame}; title="")
+    plot_kept_removed(kept_df, removed_df; title="", plot_file=nothing)
+    plot_kept_removed(kept_df, removed::Vector{DataFrame}; title="", plot_file=nothing)
 
 Map the points that were kept (green) & removed (red ×) by a filter.
 `removed` can also be the vector of DataFrames that `remove_rows` fills (it's
 fine if it's empty, ex. when none of the filters removed anything).
+To also save the map, give a `plot_file` ending in `.png` or `.pdf`.
 """
-function plot_kept_removed(kept_df::AbstractDataFrame, removed::Vector{DataFrame}; title="")
+function plot_kept_removed(kept_df::AbstractDataFrame, removed::Vector{DataFrame}; title="",
+                           plot_file::Union{Nothing,AbstractString}=nothing)
     removed_df = isempty(removed) ? DataFrame(latitude = Float64[], longitude = Float64[]) :
                                     vcat(removed...; cols=:union)
-    return plot_kept_removed(kept_df, removed_df; title=title)
+    return plot_kept_removed(kept_df, removed_df; title=title, plot_file=plot_file)
 end
 
-function plot_kept_removed(kept_df::AbstractDataFrame, removed_df::AbstractDataFrame; title="")
+function plot_kept_removed(kept_df::AbstractDataFrame, removed_df::AbstractDataFrame; title="",
+                           plot_file::Union{Nothing,AbstractString}=nothing)
     plot_title = String(title)
     kept_lat = Vector{Union{Missing,Float64}}(kept_df.latitude)
     kept_lon = Vector{Union{Missing,Float64}}(kept_df.longitude)
@@ -385,8 +388,8 @@ function plot_kept_removed(kept_df::AbstractDataFrame, removed_df::AbstractDataF
              x="Longitude", y="Latitude") +
         theme_minimal() +
         theme(plot.title=element_text(size=10))
-    print(p)
     """
+    show_rplot("print(p)"; width=9, height=7, plot_file)
     return nothing
 end
 
@@ -403,12 +406,14 @@ Set `save=true` to write the filtered result to `output_path`.
 - `taxon_label`: Label for the plot title (default: "Taxon").
 - `lat_min`, `lat_max`, `lon_min`, `lon_max`: Coordinate bounds.
 - `save`: Boolean to indicate whether to save the output (default: false).
+- `plot_file`: if given, also save the preview map here (`.png` or `.pdf`).
 """
 function filter_coords(input_path::String, output_path::String;
     taxon_label="Taxon",
     lat_min=nothing, lat_max=nothing,
     lon_min=nothing, lon_max=nothing,
-    save::Bool=false)
+    save::Bool=false,
+    plot_file::Union{Nothing,AbstractString}=nothing)
 
     df = DataFrame(CSV.File(input_path))
     keep_mask = coords_mask(df; lat_min=lat_min, lat_max=lat_max, lon_min=lon_min, lon_max=lon_max)
@@ -416,7 +421,7 @@ function filter_coords(input_path::String, output_path::String;
     removed_df = df[.!keep_mask, :]
 
     println("  Preview: $(nrow(removed_df)) point(s) will be removed, $(nrow(kept_df)) will be kept")
-    plot_kept_removed(kept_df, removed_df; title=taxon_label)
+    plot_kept_removed(kept_df, removed_df; title=taxon_label, plot_file=plot_file)
 
     if !save
         println(" Preview only — re-run with save=true to apply.")

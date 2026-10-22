@@ -28,7 +28,66 @@ function push_species_to_r(taxa, raw_file, clean_file, country_codes, georef_df,
     end
 end
 
-# Core R plotting block (rendered into a grid.arrange object in R)
+"""
+    show_rplot(draw_code; width=14, height=7, plot_file=nothing)
+
+Internal: show the plot drawn by the R code `draw_code` (ex. `"print(p)"`),
+`width` × `height` inches. If `plot_file` is given, the plot is also saved
+there, as a `.png` or `.pdf` (by its extension).
+
+R's default graphics device here is a PDF file (`Rplots.pdf` in the working
+directory), so instead the plot is rendered to a temporary PNG & handed to
+Julia's display: the plot pane in VS Code, inline in a notebook, or (in a
+plain terminal) the system's image viewer.
+"""
+function show_rplot(draw_code::AbstractString; width=14, height=7,
+                    plot_file::Union{Nothing,AbstractString}=nothing)
+    if !isnothing(plot_file)
+        _save_rplot(draw_code, plot_file; width, height)
+        println("Plot saved: $plot_file")
+    end
+
+    png_file = tempname() * ".png"
+    @rput png_file width height
+    reval("""
+        png(png_file, width=width, height=height, units="in", res=150)
+        if (dev.cur() == 1) stop("couldn't open R's png graphics device")
+        tryCatch({ $draw_code }, finally = dev.off())
+        """)
+
+    if displayable(MIME"image/png"())
+        display(MIME"image/png"(), read(png_file))
+    elseif Sys.isapple()
+        run(`open $png_file`)
+    elseif Sys.iswindows()
+        run(`cmd /c start "" $png_file`)
+    else
+        run(`xdg-open $png_file`; wait=false)
+    end
+    return png_file
+end
+
+"Internal: save the plot drawn by the R code `draw_code` to `path` (`.png` or `.pdf`)."
+function _save_rplot(draw_code::AbstractString, path::AbstractString; width, height)
+    ext = lowercase(splitext(path)[2])
+    open_device = ext == ".png" ? """png(path, width=width, height=height, units="in", res=300)""" :
+                  ext == ".pdf" ? "pdf(path, width=width, height=height)" :
+                  throw(ArgumentError("plot_file must end in .png or .pdf (got \"$path\")"))
+    dir = dirname(path)
+    isempty(dir) || isdir(dir) || mkpath(dir)
+    @rput path width height
+    reval("""
+        $open_device
+        if (dev.cur() == 1) stop("couldn't open a graphics device for ", path)
+        tryCatch({ $draw_code }, finally = dev.off())
+        """)
+    return path
+end
+
+# Core R plotting block. Builds the before/after maps & defines `draw_combined()`
+# to draw them side by side. Nothing's drawn until that's called: arranging the
+# maps needs a graphics device, & without one open R opens its default one,
+# which writes to Rplots.pdf.
 
 const RPLOT_BLOCK = """
     raw_df  <- read.csv(raw_file)
@@ -101,12 +160,13 @@ const RPLOT_BLOCK = """
               legend.title=element_text(size=9),
               legend.text=element_text(size=8))
 
-    if (only_clean) {
-        combined <- grid.arrange(p2, ncol=1, top=taxa)
-    } else {
-        combined <- grid.arrange(p1, p2, ncol=2, top=taxa)
+    draw_combined <- function() {
+        if (only_clean) {
+            grid.arrange(p2, ncol=1, top=taxa)
+        } else {
+            grid.arrange(p1, p2, ncol=2, top=taxa)
+        }
     }
-    print(combined)
 """
 
 """
@@ -118,10 +178,12 @@ const RPLOT_BLOCK = """
         filtered_dir   = nothing,
         shapefile_path = <the TDWG level-3 shapefile that comes with the package>,
         append_date    = true,
-        species_ranges_path = nothing)
+        species_ranges_path = nothing,
+        plot_file      = nothing)
 
-Display a before/after occurrence map for a single `taxa` string in the R
-graphics viewer (no PDF output).
+Display a before/after occurrence map for a single `taxa` string (in the VS Code
+plot pane, a notebook, or the system's image viewer). To also save it, give a
+`plot_file` ending in `.png` or `.pdf`.
 
 If `append_date` is true, the raw file is the most recently pulled
 `<taxon>-<date>.csv` in `raw_dir`; otherwise it's `<taxon>.csv`.
@@ -132,6 +194,7 @@ instead of the ones in `clean_dir`.
 # Example
 ```julia
 plot_species("Calceolaria alba")
+plot_species("Calceolaria alba"; plot_file="maps/Calceolaria_alba.png")
 ```
 """
 function plot_species(taxa::String;
@@ -144,7 +207,8 @@ function plot_species(taxa::String;
     append_date::Bool=true,
     species_ranges_path::Union{String,Nothing}=nothing,
     only_clean=false,
-    min_points=0
+    min_points=0,
+    plot_file::Union{Nothing,AbstractString}=nothing
 )
     _, taxa_to_nativerange_dict = load_taxa_data(traits_path; species_ranges_path=species_ranges_path)
     load_bot_regions(shapefile_path)
@@ -177,6 +241,7 @@ function plot_species(taxa::String;
 
     push_species_to_r(taxa, raw_file, clean_file, country_codes, georef_df, only_clean)
     reval(RPLOT_BLOCK)
+    show_rplot("draw_combined()"; width = only_clean ? 7 : 14, height=7, plot_file)
 
     println("Plot displayed for: $taxa")
     return nothing
@@ -259,6 +324,7 @@ function plot_all_occurrence_maps(;
 
         push_species_to_r(taxa, raw_file, clean_file, country_codes, georef_df, only_clean)
         reval(RPLOT_BLOCK)
+        R"draw_combined()"
         plotted_count += 1
     end
 
