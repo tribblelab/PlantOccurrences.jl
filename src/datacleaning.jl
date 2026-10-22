@@ -385,8 +385,8 @@ function plot_kept_removed(kept_df::AbstractDataFrame, removed_df::AbstractDataF
           else NULL } +
         coord_sf(xlim=c(min(all_lon, na.rm=TRUE)-2, max(all_lon, na.rm=TRUE)+2),
                  ylim=c(min(all_lat, na.rm=TRUE)-2, max(all_lat, na.rm=TRUE)+2)) +
-        labs(title=paste0(plot_title, "  —  green: kept (", nrow(kept_pts),
-                          ")   red ×: removed (", nrow(removed_pts), ")"),
+        labs(title=paste0(plot_title, "  \u2014  green: kept (", nrow(kept_pts),
+                          ")   red \u00d7: removed (", nrow(removed_pts), ")"),
              x="Longitude", y="Latitude") +
         theme_minimal() +
         theme(plot.title=element_text(size=10))
