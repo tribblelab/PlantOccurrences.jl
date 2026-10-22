@@ -5,9 +5,10 @@ using DataFrames
 using Dates
 using HTTP
 using JSON3
+using NetworkOptions
 using RCall
 
-export build_checklist, ChecklistEntry, to_table, checklist_synonyms, checklist_native_range, checklist_homonyms
+export build_checklist, build_wfo_checklist, ChecklistEntry, to_table, checklist_synonyms, checklist_native_range, checklist_homonyms
 export pull_occurrences, append_occurrences
 export latest_raw_file, resolve_clean_file, latest_no_coords_file, taxon_files, taxon_stem, read_occs,
     normalize_id, load_taxa_data, read_georef_file, load_georef_df, load_pt_occs_df

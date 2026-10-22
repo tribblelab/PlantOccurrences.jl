@@ -1,6 +1,6 @@
 # PlantOccurrences.jl
 
-Build a plant name checklist (WCVP / POWO), pull occurrence records for each
+Build a plant name checklist (WCVP / POWO, or World Flora Online), pull occurrence records for each
 taxon & its synonyms (GBIF / iDigBio), then clean, georeference & map them.
 
 The package covers the steps *before* niche modeling: it gets you from a list of

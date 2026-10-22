@@ -341,9 +341,18 @@ end
 
 """
     plot_kept_removed(kept_df, removed_df; title="")
+    plot_kept_removed(kept_df, removed::Vector{DataFrame}; title="")
 
 Map the points that were kept (green) & removed (red ×) by a filter.
+`removed` can also be the vector of DataFrames that `remove_rows` fills (it's
+fine if it's empty, ex. when none of the filters removed anything).
 """
+function plot_kept_removed(kept_df::AbstractDataFrame, removed::Vector{DataFrame}; title="")
+    removed_df = isempty(removed) ? DataFrame(latitude = Float64[], longitude = Float64[]) :
+                                    vcat(removed...; cols=:union)
+    return plot_kept_removed(kept_df, removed_df; title=title)
+end
+
 function plot_kept_removed(kept_df::AbstractDataFrame, removed_df::AbstractDataFrame; title="")
     plot_title = String(title)
     kept_lat = Vector{Union{Missing,Float64}}(kept_df.latitude)

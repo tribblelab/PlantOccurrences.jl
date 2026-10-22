@@ -2,7 +2,7 @@
 
 A full run for two species of *Calceolaria*, from a name checklist to occurrence
 maps. The code on this page isn't run when the documentation is built (it
-downloads from POWO, GBIF & iDigBio), so no output is shown.
+downloads from POWO (or WFO), GBIF & iDigBio), so no output is shown.
 
 ```julia
 using PlantOccurrences
@@ -32,6 +32,29 @@ checklist = build_checklist("Calceolariaceae", "Calceolaria"; output_file="data/
 
 Looking up the native ranges takes one request per accepted name, so it's the
 slow part of a large checklist. Use `include_distribution=false` to skip it.
+
+### Or: build it from World Flora Online
+
+[`build_wfo_checklist`](@ref) builds the same checklist from World Flora Online
+(WFO) instead, & takes the same family + genus (or genera) arguments:
+
+```julia
+checklist = build_wfo_checklist("Calceolariaceae", "Calceolaria"; output_file="data/calceolaria_wfo_checklist.csv")
+```
+
+The rest of this example works the same way with either checklist, except:
+
+- **WFO has no distribution data**, so the checklist's `native_range` &
+  `native_range_codes` columns are empty. [`checklist_native_range`](@ref)
+  returns an empty vector, so the `botanicalCountries` in step 7 will be empty
+  too & the maps won't show a native range. To get native ranges, use
+  [`build_checklist`](@ref) (POWO).
+- Its synonyms are the names that point to a taxon in the genus, from any
+  genus. Names *in* the genus that are synonyms of taxa in other genera aren't
+  included.
+- WFO also lists names it hasn't placed as either accepted or a synonym. They
+  come in with `accepted = false` & no `accepted_name`; use
+  `include_unplaced=false` to leave them out.
 
 ## 2. Get each taxon's synonyms & homonyms
 
@@ -114,13 +137,13 @@ Each `*_mask` function returns `true` for the rows to keep, and
 & why:
 
 ```julia
-df = read_occs(resolve_clean_file("Calceolaria_alba", clean_dir))
+df = read_occs(resolve_clean_file("Calceolaria_nitida", clean_dir))
 removed = DataFrame[]
 
-df = remove_rows(df, coords_mask(df; lat_min=-40), "south of -40", removed)
+df = remove_rows(df, coords_mask(df; lat_min=-38), "south of -38", removed)
 df = remove_rows(df, countries_mask(df, ["Argentina"]), "outside native range", removed)
 
-plot_kept_removed(df, vcat(removed...; cols=:union); title="Calceolaria alba")
+plot_kept_removed(df, removed; title="Calceolaria nitida")
 ```
 
 There are also file-to-file versions: [`filter_coords`](@ref) (which previews
@@ -130,7 +153,9 @@ the result on a map before saving anything), [`filter_countries`](@ref) &
 ## 7. Map the results
 
 The maps need a CSV of the taxa with `scientificName` & `botanicalCountries`
-columns, which is used to draw each taxon's native range under its points:
+columns, which is used to draw each taxon's native range under its points
+(the native ranges come from a POWO checklist; with a WFO one,
+`botanicalCountries` is empty & no native range is drawn):
 
 ```julia
 traits = DataFrame(
