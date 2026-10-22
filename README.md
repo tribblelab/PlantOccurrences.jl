@@ -1,6 +1,6 @@
 # PlantOccurrences.jl
 
-build a plant name checklist (WCVP / POWO, or World Flora Online), pull occurrence records for each taxon & its synonyms (GBIF / iDigBio), then clean, georeference & map them.
+build a plant name checklist ([WCVP / POWO](https://powo.science.kew.org/), or [World Flora Online](https://www.worldfloraonline.org/), pull occurrence records for each taxon & its synonyms ([GBIF](https://www.gbif.org/) / [iDigBio](https://idigbio.gbif.us/), then clean, georeference & map them.
 
 documentation & a worked example: <https://tribblelab.github.io/PlantOccurrences.jl/dev/>
 
