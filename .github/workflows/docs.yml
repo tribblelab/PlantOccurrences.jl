@@ -20,7 +20,7 @@ jobs:
       statuses: write
     steps:
       - uses: actions/checkout@v4
-      # the package loads its R libraries when it's imported, so they have to be installed to build the docs
+      # RCall needs R installed to load the package (the R packages themselves are only loaded when a function uses them)
       - uses: r-lib/actions/setup-r@v2
         with:
           use-public-rspm: true

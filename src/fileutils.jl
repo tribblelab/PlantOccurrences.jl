@@ -147,6 +147,7 @@ named `VIABLE` & `NOTES` whatever their capitalisation in the file; `VIABLE` is
 function read_georef_file(path::String)
     df = if endswith(path, ".xlsx")
         georef_path = path
+        load_r_packages()
         @rput georef_path
         R"georef_r <- readxl::read_excel(georef_path)"
         @rget georef_r

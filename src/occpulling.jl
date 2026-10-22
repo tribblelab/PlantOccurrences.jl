@@ -49,6 +49,7 @@ function pull_occurrences(synonymdict::AbstractDict, raw_dir::String;
             continue
         end
 
+        load_r_packages()
         @rput synlist filepath
         try
             R"gators_download(synonyms.list = synlist, write.file = TRUE, filename = filepath)"

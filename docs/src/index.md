@@ -15,8 +15,8 @@ taxa to one cleaned occurrence file per taxon.
 
 The pulling, cleaning & plotting functions call R (via
 [RCall](https://github.com/JuliaInterop/RCall.jl)), so R needs to be installed,
-along with these packages. They're loaded when the package is, so install them
-first:
+along with these packages. They're loaded the first time one of those functions
+runs (`using PlantOccurrences` works without them):
 
 ```r
 packages <- c("gatoRs", "ggplot2", "sf", "ggspatial", "gridExtra", "readxl", "dplyr")

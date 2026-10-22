@@ -105,6 +105,7 @@ function clean_occurrences(synonymdict::AbstractDict, raw_dir::String, clean_dir
     mkpath(clean_dir)
     mkpath(no_coords_dir)
 
+    load_r_packages()
     @rput basis_to_remove lat_min lat_max lon_min lon_max countries_to_remove drop_missing_country digits
 
     for taxa in sort(collect(keys(synonymdict)))
@@ -362,6 +363,7 @@ function plot_kept_removed(kept_df::AbstractDataFrame, removed_df::AbstractDataF
     kept_lon = Vector{Union{Missing,Float64}}(kept_df.longitude)
     removed_lat = Vector{Union{Missing,Float64}}(removed_df.latitude)
     removed_lon = Vector{Union{Missing,Float64}}(removed_df.longitude)
+    load_r_packages()
     @rput plot_title kept_lat kept_lon removed_lat removed_lon
     R"""
     kept_pts    <- data.frame(latitude  = as.numeric(kept_lat),
@@ -496,6 +498,7 @@ function prepare_geolocate_files(
         input_file = joinpath(input_dir, file)
         output_file = joinpath(output_dir, file)
 
+        load_r_packages()
         @rput input_file output_file
 
         R"""

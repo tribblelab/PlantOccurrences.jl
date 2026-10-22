@@ -9,6 +9,7 @@ default_shapefile_path() = joinpath(pkgdir(@__MODULE__), "data", "bot_country_sh
 Load TDWG botanical country polygons into R (once, globally).
 """
 function load_bot_regions(shapefile_path=default_shapefile_path())
+    load_r_packages()
     @rput shapefile_path
     R"bot_regions = st_read(shapefile_path, quiet = TRUE)"
 end
@@ -19,6 +20,7 @@ end
 Transfer all data needed by the R plotting block to R's environment.
 """
 function push_species_to_r(taxa, raw_file, clean_file, country_codes, georef_df, only_clean=false)
+    load_r_packages()
     @rput taxa raw_file clean_file country_codes only_clean
     has_georef = !isnothing(georef_df) && nrow(georef_df) > 0
     @rput has_georef
@@ -48,6 +50,7 @@ function show_rplot(draw_code::AbstractString; width=14, height=7,
     end
 
     png_file = tempname() * ".png"
+    load_r_packages()
     @rput png_file width height
     reval("""
         png(png_file, width=width, height=height, units="in", res=150)
@@ -75,6 +78,7 @@ function _save_rplot(draw_code::AbstractString, path::AbstractString; width, hei
                   throw(ArgumentError("plot_file must end in .png or .pdf (got \"$path\")"))
     dir = dirname(path)
     isempty(dir) || isdir(dir) || mkpath(dir)
+    load_r_packages()
     @rput path width height
     reval("""
         $open_device
@@ -280,6 +284,7 @@ function plot_all_occurrence_maps(;
     taxa_traits, taxa_to_nativerange_dict = load_taxa_data(traits_path; species_ranges_path=species_ranges_path)
     load_bot_regions(shapefile_path)
 
+    load_r_packages()
     @rput pdf_file
     R"pdf(pdf_file, width=14, height=7)"
 

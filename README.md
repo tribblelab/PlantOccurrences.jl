@@ -6,7 +6,7 @@ documentation & a worked example: <https://tribblelab.github.io/PlantOccurrences
 
 ## R package dependencies + install
 
-the cleaning, pulling & plotting functions call R (via RCall), so R needs to be installed, along with these packages. they're loaded when the package is, so install them first:
+the cleaning, pulling & plotting functions call R (via RCall), so R needs to be installed, along with these packages. they're loaded the first time one of those functions runs (`using PlantOccurrences` works without them):
 
 ```R
 packages <- c("gatoRs", "ggplot2", "sf", "ggspatial", "gridExtra", "readxl", "dplyr")
