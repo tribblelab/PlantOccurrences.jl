@@ -73,6 +73,10 @@ stats = clean_occurrences(synonymdict, "data/pt_occs_raw", "data/pt_occs_clean",
 prepare_geolocate_files("data/pt_occs_to_georeference", "data/pt_occs_to_georeference_geolocate_format")
 ```
 
+## Botanical country shapefiles
+
+In [data/bot_country_shapefiles](https://github.com/tribblelab/PlantOccurrences.jl/tree/main/data/bot_country_shapefiles), there are shapefiles for plotting botanical countries, copied from the [World Geographical Scheme for Recording Plant Distributions](https://github.com/tdwg/wgsrpd/tree/master/level3). These were downloaded on 2026-4-15.
+
 ## AI usage
 
 This package has been developed with help from Anthropic's Claude (mainly Opus 5.5 model), refactoring code written by the developer for [hyb_niches](https://github.com/tribblelab/hyb_niches) to be generalizable for all plant taxa. All functions/examples have been tested by the developer.
