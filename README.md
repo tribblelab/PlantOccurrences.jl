@@ -14,25 +14,15 @@ new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
 if(length(new_packages)) install.packages(new_packages)
 ```
 
-## installing
+## installing / using
 
-the package isn't registered (yet), so add it from GitHub:
-
+installation:
 ```julia
-using Pkg
-Pkg.add(url="https://github.com/tribblelab/PlantOccurrences.jl")
+julia> ]  # enters the pkg interface
+pkg> add PlantOccurrences
 ```
 
-or, to work on the package itself, clone the repo & start Julia in it with `julia --project`:
-
-```julia
-using Pkg
-# install the packages listed in the environment
-Pkg.instantiate()
-```
-
-then:
-
+usage thereafter:
 ```julia
 using PlantOccurrences
 ```
