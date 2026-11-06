@@ -4,3 +4,4 @@ PlantOccurrences = "41e93952-0be5-45ed-9935-83314b503f47"
 
 [compat]
 Documenter = "1"
+PlantOccurrences = "0.1.0"
