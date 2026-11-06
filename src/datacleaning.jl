@@ -57,7 +57,8 @@ end
 Batch-clean the most recently pulled raw occurrence CSV (see `latest_raw_file`)
 of every taxon in `synonymdict`, using `gatoRs`. For each taxon:
 
-1. standardize `basisOfRecord` & drop the record types in `basis_to_remove`
+1. standardize `basisOfRecord` & drop the record types in `basis_to_remove`; blank
+   `eventDate`s are set to `NA` (otherwise `remove_duplicates` drops undated records)
 2. `gatoRs::taxa_clean`: keep records matching the taxon's synonym list
 3. `gatoRs::remove_duplicates`: drop duplicates between GBIF & iDigBio
 4. drop the homonyms in `homonyms_to_exclude` (exact match on name + authority)
@@ -128,6 +129,10 @@ function clean_occurrences(synonymdict::AbstractDict, raw_dir::String, clean_dir
         R"""
         df <- read.csv(filepath)
         nrow_raw <- nrow(df)
+
+        # files written from Julia (ex. by append_occurrences) have "" for a missing eventDate,
+        # not NA: remove_duplicates can't parse "" & drops the record, but keeps NA dates
+        df$eventDate[!is.na(df$eventDate) & trimws(df$eventDate) == ""] <- NA
 
         # standardize and filter basis of record
         df$basisOfRecord[df$basisOfRecord %in% c("preservedspecimen", "PreservedSpecimen", "Preserved Specimen")] <- "PRESERVED_SPECIMEN"

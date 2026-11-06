@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Keep the versions of GitHub Actions used in .github/workflows up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      all-actions:
+        patterns:
+          - "*"
+  # Open PRs to widen [compat] bounds when dependencies release new versions
+  - package-ecosystem: "julia"
+    directories:
+      - "/"
+      - "/docs"
+    schedule:
+      interval: "monthly"
+    groups:
+      all-julia-packages:
+        patterns:
+          - "*"

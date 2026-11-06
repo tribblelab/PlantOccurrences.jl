@@ -1,27 +1,31 @@
 name = "PlantOccurrences"
 uuid = "41e93952-0be5-45ed-9935-83314b503f47"
 authors = ["Lauren Frankel"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
 NetworkOptions = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 RCall = "6f49c342-dc21-5d91-9882-a32aef131414"
+p7zip_jll = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 
 [compat]
 CSV = "0.10"
 DataFrames = "1"
 Dates = "1"
+Downloads = "1"
 HTTP = "2"
 JSON3 = "1"
 NetworkOptions = "1"
 RCall = "0.14"
 Test = "1"
 julia = "1.10"
+p7zip_jll = "17"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

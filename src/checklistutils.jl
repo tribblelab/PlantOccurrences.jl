@@ -1,22 +1,21 @@
 #=
 checklistutils.jl
 
-Builds a plant-name checklist for a given family + genus (or genera), using
-the same underlying data source (WCVP, via the POWO search API) that powers
-Kew's "Build a checklist" tool at:
+Builds a plant-name checklist for a given family + genus (or genera), from
+the World Checklist of Vascular Plants (WCVP) -- the data behind POWO
+(https://powo.science.kew.org/) and Kew's "Build a checklist" tool at
 https://checklistbuilder.science.kew.org/reportbuilder.do
 
-NOTE ON WHY THIS TALKS TO powo.science.kew.org INSTEAD OF checklistbuilder:
-`reportbuilder.do` is a legacy, session-bound multi-page Java web app
-(jsessionid, hidden form state, a genus dropdown that's AJAX-populated only
-after a family is picked). It has no documented/stable set of POST
-parameters, so it can't be reliably driven from an external script -- any
-attempt would be guesswork that could silently return wrong results.
+NOTE ON WHY THIS READS KEW'S BULK DOWNLOAD INSTEAD OF THE POWO API:
+The POWO API (powo.science.kew.org/api/...) is now behind a Cloudflare bot
+check, so scripted requests to it get a 403 "Just a moment..." page instead
+of JSON. Kew also publishes the whole of WCVP as a zip of pipe-delimited
+tables at https://sftp.kew.org/pub/data-repositories/WCVP/ (updated a few
+times a year), which isn't behind that check. `download_wcvp` downloads it
+once (~84 MB zipped, ~440 MB unzipped), & `build_checklist` reads it from
+disk, so a checklist is also reproducible from a given WCVP release.
 
-The POWO search API (used internally by Kew's own `pykew` and the
-community `kewr` R package) exposes the same WCVP-backed data and is
-queryable directly. This function reproduces the checklist builder's
-*default* settings:
+This reproduces the checklist builder's *default* settings:
   - Taxonomy filter: family + genus (or genera)
   - Distribution: none selected (i.e. worldwide / no location filter)
   - Type of taxa: "Native and Introduced taxa" (i.e. no native/introduced/
@@ -28,43 +27,103 @@ queryable directly. This function reproduces the checklist builder's
 Online instead (see the section on it below).
 =#
 
-const POWO_SEARCH_URL = "https://powo.science.kew.org/api/1/search"
-const POWO_TAXON_URL  = "https://powo.science.kew.org/api/2/taxon"
+const WCVP_URL = "https://sftp.kew.org/pub/data-repositories/WCVP/wcvp.zip"
+const WCVP_NAMES_FILE = "wcvp_names.csv"
+const WCVP_DISTRIBUTION_FILE = "wcvp_distribution.csv"
+
+# POWO's taxon ids are IPNI-style LSIDs built from WCVP's `powo_id`, ex.
+# https://powo.science.kew.org/taxon/urn:lsid:ipni.org:names:295298-1
+const POWO_ID_PREFIX = "urn:lsid:ipni.org:names:"
+
+# misapplied names are names used (wrongly) for another taxon, so they're
+# left out: records under them are mostly of the taxon the name really belongs to
+const _WCVP_EXCLUDED_STATUSES = ["Misapplied"]
+
+"Default folder WCVP is downloaded to & read from: `<julia depot>/PlantOccurrences/wcvp`."
+default_wcvp_dir() = joinpath(first(DEPOT_PATH), "PlantOccurrences", "wcvp")
+
+_has_wcvp(dir) = all(isfile(joinpath(dir, f)) for f in (WCVP_NAMES_FILE, WCVP_DISTRIBUTION_FILE))
+
+# the WCVP tables, once they've been read in: dir => (names, distribution)
+const _WCVP_CACHE = Dict{String,Dict{Symbol,DataFrame}}()
 
 """
-    _fetch_native_range(fqid; sleep_after) -> (names, codes)
+    download_wcvp(dir=default_wcvp_dir(); force=false) -> dir
 
-Internal: look up a single taxon's native distribution from POWO's taxon
-detail endpoint (the search endpoint doesn't carry distribution data, so
-this is a separate request per accepted name). Returns a "; "-joined list
-of native TDWG area names and a matching "; "-joined list of their TDWG
-codes (ex. "Chile Central; Chile South" and "CLC; CLS"), or "" for both if
-unavailable/unparseable.
+Download the World Checklist of Vascular Plants (WCVP) from Kew
+($WCVP_URL) & unzip it into `dir`. `build_checklist` calls this itself the
+first time it's run, so you only need to call it to put WCVP somewhere else, or
+with `force=true` to update to Kew's latest release.
+
+Besides the WCVP tables (`$WCVP_NAMES_FILE`, `$WCVP_DISTRIBUTION_FILE` &
+`README_WCVP.xlsx`), it writes `wcvp_downloaded.txt`, with where & when it was
+downloaded, for citing the version you used.
 """
-function _fetch_native_range(fqid::AbstractString; sleep_after::Float64)
-    isempty(fqid) && return ("", "")
-
-    url = "$(POWO_TAXON_URL)/$(HTTP.escapeuri(fqid))"
-    native_range = ""
-    native_range_codes = ""
-    try
-        resp = HTTP.get(url; query = Dict("fields" => "distribution"),
-                         retry = true, request_timeout = 30)
-        body = JSON3.read(String(resp.body))
-
-        if haskey(body, :distribution) && !isnothing(body.distribution) &&
-           haskey(body.distribution, :natives) && !isnothing(body.distribution.natives)
-            areas = [(string(get(area, :name, "")), string(get(area, :tdwgCode, ""))) for area in body.distribution.natives]
-            filter!(area -> !isempty(first(area)), areas)
-            native_range = join(first.(areas), "; ")
-            native_range_codes = join(last.(areas), "; ")
-        end
-    catch e
-        @warn "Could not fetch native range for taxon $fqid" exception = e
+function download_wcvp(dir::AbstractString = default_wcvp_dir(); force::Bool = false)
+    if _has_wcvp(dir) && !force
+        @info "WCVP is already downloaded in $dir (use force=true to re-download it)"
+        return dir
     end
+    mkpath(dir)
+    zip = joinpath(dir, "wcvp.zip")
+    @info "Downloading WCVP (~84 MB) from $WCVP_URL to $dir"
+    Downloads.download(WCVP_URL, zip)
+    run(pipeline(`$(p7zip_jll.p7zip()) x $zip -o$dir -y`; stdout = devnull))
+    rm(zip)
+    write(joinpath(dir, "wcvp_downloaded.txt"), "downloaded from $WCVP_URL on $(Dates.today())\n")
+    delete!(_WCVP_CACHE, abspath(dir))
+    return dir
+end
 
-    sleep(sleep_after)
-    return (native_range, native_range_codes)
+"""
+    _wcvp_table(dir, which) -> DataFrame
+
+Internal: WCVP's names (`which = :names`) or distribution (`:distribution`)
+table, read from `dir` the first time it's needed & kept in memory after that.
+"""
+function _wcvp_table(dir::AbstractString, which::Symbol)
+    tables = get!(Dict{Symbol,DataFrame}, _WCVP_CACHE, abspath(dir))
+    return get!(tables, which) do
+        # ids are read as strings, since some aren't numbers (ex. powo_id "34958-4")
+        if which == :names
+            CSV.read(joinpath(dir, WCVP_NAMES_FILE), DataFrame; delim = '|', quoted = false,
+                     select = [:plant_name_id, :taxon_rank, :taxon_status, :family, :genus,
+                               :taxon_name, :taxon_authors, :accepted_plant_name_id, :powo_id],
+                     types = Dict(:plant_name_id => String, :accepted_plant_name_id => String,
+                                  :powo_id => String))
+        else
+            CSV.read(joinpath(dir, WCVP_DISTRIBUTION_FILE), DataFrame; delim = '|', quoted = false,
+                     select = [:plant_name_id, :area_code_l3, :area, :introduced, :extinct, :location_doubtful],
+                     types = Dict(:plant_name_id => String))
+        end
+    end
+end
+
+_wcvp_str(x) = ismissing(x) ? "" : String(x)
+
+"""
+    _wcvp_native_ranges(dir, plant_name_ids) -> Dict(id => (names, codes))
+
+Internal: the native distributions of WCVP taxa, as a "; "-joined list of
+native TDWG area names and a matching "; "-joined list of their TDWG codes
+(ex. "Chile Central; Chile South" and "CLC; CLS"), sorted by area name. Areas
+where the taxon is introduced, extinct, or only doubtfully recorded are left
+out (like POWO's "Native to" list). Taxa with no native areas aren't in the result.
+"""
+function _wcvp_native_ranges(dir::AbstractString, plant_name_ids)
+    dist = _wcvp_table(dir, :distribution)
+    ids = Set{String}(plant_name_ids)
+    keep = [id in ids && intro == 0 && ext == 0 && doubtful == 0
+            for (id, intro, ext, doubtful) in zip(dist.plant_name_id, dist.introduced,
+                                                   dist.extinct, dist.location_doubtful)]
+    ranges = Dict{String,Tuple{String,String}}()
+    for group in groupby(dist[keep, :], :plant_name_id)
+        areas = sort!(unique!([(_wcvp_str(a), _wcvp_str(c)) for (a, c) in zip(group.area, group.area_code_l3)]))
+        filter!(area -> !isempty(first(area)), areas)
+        isempty(areas) && continue
+        ranges[group.plant_name_id[1]] = (join(first.(areas), "; "), join(last.(areas), "; "))
+    end
+    return ranges
 end
 
 "One name record in the checklist."
@@ -86,79 +145,46 @@ struct ChecklistEntry
 end
 
 """
-    _fetch_one(family, genus; page_size, max_results, include_synonyms, sleep_between) -> Vector{ChecklistEntry}
+    _wcvp_entries(names, family, genus; include_synonyms) -> Vector{Tuple{String,ChecklistEntry}}
 
-Internal: fetch (and page through) results for a single family/genus combination.
-`genus` may be "" to fetch the whole family.
+Internal: the WCVP names in a single family/genus combination, as
+`(plant_name_id, entry)` pairs. `genus` may be "" for the whole family.
 """
-function _fetch_one(family::AbstractString, genus::AbstractString;
-                     page_size::Int, max_results::Int,
-                     include_synonyms::Bool, sleep_between::Float64)
+function _wcvp_entries(names::DataFrame, family::AbstractString, genus::AbstractString;
+                       include_synonyms::Bool)
+    family, genus = strip(family), strip(genus)
+    rows = names[[coalesce(f, "") == family && (isempty(genus) || coalesce(g, "") == genus) &&
+                  !(coalesce(s, "") in _WCVP_EXCLUDED_STATUSES)
+                  for (f, g, s) in zip(names.family, names.genus, names.taxon_status)], :]
+    include_synonyms || filter!(r -> r.taxon_status == "Accepted", rows)
 
-    query_parts = String["family:$(strip(family))"]
-    if !isempty(strip(genus))
-        push!(query_parts, "genus:$(strip(genus))")
-    end
-    query_str = join(query_parts, ",")
+    # the accepted names the synonyms point to (which can be in another genus or family)
+    targets = Set(skipmissing(rows.accepted_plant_name_id))
+    accepted_names = Dict(id => (_wcvp_str(n), _wcvp_str(a))
+                          for (id, n, a) in zip(names.plant_name_id, names.taxon_name, names.taxon_authors)
+                          if id in targets)
 
-    entries = ChecklistEntry[]
-    cursor = "*"
-    fetched = 0
-
-    while true
-        params = Dict(
-            "q"       => query_str,
-            "perPage" => string(page_size),
-            "cursor"  => cursor,
-        )
-
-        resp = HTTP.get(POWO_SEARCH_URL; query = params, retry = true, request_timeout = 30)
-        body = JSON3.read(String(resp.body))
-
-        results = haskey(body, :results) ? body.results : Any[]
-        isempty(results) && break
-
-        for r in results
-            accepted = get(r, :accepted, false)
-            if !accepted && !include_synonyms
-                continue
-            end
-
-            name    = string(get(r, :name, ""))
-            author  = string(get(r, :author, ""))
-            rank    = string(get(r, :rank, ""))
-            fam     = string(get(r, :family, ""))
-            fqid    = string(get(r, :fqId, ""))
-
-            accepted_name = ""
-            accepted_author = ""
-            if haskey(r, :synonymOf) && !isnothing(r.synonymOf)
-                accepted_name = string(get(r.synonymOf, :name, ""))
-                accepted_author = string(get(r.synonymOf, :author, ""))
-            end
-
-            push!(entries, ChecklistEntry(name, author, rank, fam, genus, accepted, accepted_name, accepted_author, fqid, "", ""))
+    entries = Tuple{String,ChecklistEntry}[]
+    for r in eachrow(rows)
+        accepted = r.taxon_status == "Accepted"
+        accepted_name, accepted_author = "", ""
+        target = _wcvp_str(r.accepted_plant_name_id)
+        if !accepted && !isempty(target) && target != r.plant_name_id
+            accepted_name, accepted_author = get(accepted_names, target, ("", ""))
         end
-
-        fetched += length(results)
-        total = get(body, :totalResults, fetched)
-
-        next_cursor = string(get(body, :cursor, ""))
-        if fetched >= total || fetched >= max_results || next_cursor == cursor || isempty(next_cursor)
-            break
-        end
-        cursor = next_cursor
-
-        sleep(sleep_between)
+        push!(entries, (r.plant_name_id,
+                        ChecklistEntry(_wcvp_str(r.taxon_name), _wcvp_str(r.taxon_authors), _wcvp_str(r.taxon_rank),
+                                       _wcvp_str(r.family), String(genus), accepted, accepted_name, accepted_author,
+                                       POWO_ID_PREFIX * _wcvp_str(r.powo_id), "", "")))
     end
-
     return entries
 end
 
 """
     build_checklist(family, genus=""; kwargs...) -> DataFrame
 
-Build a checklist for `family` (required) and optionally `genus`.
+Build a checklist for `family` (required) and optionally `genus`, from the
+World Checklist of Vascular Plants (WCVP, the data behind POWO).
 
 `genus` can be:
 - omitted or `""`                -> whole family
@@ -167,36 +193,34 @@ Build a checklist for `family` (required) and optionally `genus`.
   (each genus is queried separately against the same family and the
   results are combined and de-duplicated)
 
+WCVP is read from Kew's bulk download (see [`download_wcvp`](@ref)), which is
+downloaded to `wcvp_dir` the first time this is run (~84 MB). Reading it in
+takes a few seconds the first time in a session; after that it's kept in memory.
+
 Keyword arguments:
-- `page_size::Int = 100`      : results requested per page (API max is 500)
-- `max_results::Int = 100_000`: safety cap on total records fetched *per genus*
 - `include_synonyms::Bool = true` : include synonym names as well as accepted ones
                                      (matches "Detailed Checklist" style completeness;
-                                     set to false to mimic filtering to accepted names only)
-- `sleep_between::Float64 = 0.15` : seconds to wait between paged requests (politeness)
-- `include_distribution::Bool = true` : fetch each accepted name's native botanical
-    (TDWG) country/area range from POWO's taxon detail endpoint. This costs one
-    extra HTTP request per *unique accepted name*, so it's the slowest part of
-    a large checklist -- set to `false` to skip it and get results faster.
-    Synonyms are left with `native_range = ""` (their accepted name carries the
-    range instead). The matching TDWG level-3 codes go in `native_range_codes`.
-- `distribution_sleep::Float64 = 0.1` : seconds to wait between per-taxon
-    distribution requests (politeness)
+                                     set to false to mimic filtering to accepted names only).
+                                     Misapplied names are never included.
+- `include_distribution::Bool = true` : add each accepted name's native botanical
+    (TDWG) country/area range, from WCVP's distribution table. Synonyms are left
+    with `native_range = ""` (their accepted name carries the range instead).
+    The matching TDWG level-3 codes go in `native_range_codes`.
+- `wcvp_dir::AbstractString = default_wcvp_dir()` : the folder WCVP is downloaded
+    to & read from
 - `output_file::Union{Nothing,AbstractString} = nothing` :
     if given, also write the checklist out to this path.
     - a path ending in `.csv` is written with CSV.jl
     - any other extension (e.g. `.txt`) is written as an aligned plain-text table
 
-Returns a `DataFrame` sorted by (genus_queried, name).
+Returns a `DataFrame` sorted by (genus_queried, name). `ipni_id` is the name's
+POWO id (ex. "urn:lsid:ipni.org:names:295298-1").
 """
 function build_checklist(family::AbstractString,
                           genus::Union{AbstractString,AbstractVector{<:AbstractString}}="";
-                          page_size::Int = 100,
-                          max_results::Int = 100_000,
                           include_synonyms::Bool = true,
-                          sleep_between::Float64 = 0.15,
                           include_distribution::Bool = true,
-                          distribution_sleep::Float64 = 0.1,
+                          wcvp_dir::AbstractString = default_wcvp_dir(),
                           output_file::Union{Nothing,AbstractString} = nothing)
 
     isempty(strip(family)) && throw(ArgumentError("`family` is required, e.g. build_checklist(\"Fagaceae\", \"Quercus\")"))
@@ -219,37 +243,37 @@ function build_checklist(family::AbstractString,
         genera = cleaned
     end
 
+    _has_wcvp(wcvp_dir) || download_wcvp(wcvp_dir)
+    names = _wcvp_table(wcvp_dir, :names)
+
     all_entries = ChecklistEntry[]
+    plant_name_ids = String[]  # WCVP's id for each entry, for looking up its range
     seen_keys = Set{Tuple{String,String}}()  # (ipni_id, name) de-dup across genera
 
     for g in genera
-        entries = _fetch_one(family, g;
-                              page_size = page_size, max_results = max_results,
-                              include_synonyms = include_synonyms, sleep_between = sleep_between)
-        for e in entries
+        entries = _wcvp_entries(names, family, g; include_synonyms = include_synonyms)
+        isempty(entries) && @warn "No WCVP names found for family \"$(strip(family))\"" *
+                                  (isempty(strip(g)) ? "" : ", genus \"$(strip(g))\"")
+        for (id, e) in entries
             key = (e.ipni_id, e.name)
             if !(key in seen_keys)
                 push!(seen_keys, key)
                 push!(all_entries, e)
+                push!(plant_name_ids, id)
             end
         end
     end
 
     if include_distribution
-        range_cache = Dict{String,Tuple{String,String}}()  # ipni_id -> (native_range, codes), avoids re-fetching
-        for (i, e) in enumerate(all_entries)
+        accepted_ids = [id for (id, e) in zip(plant_name_ids, all_entries) if e.accepted]
+        ranges = _wcvp_native_ranges(wcvp_dir, accepted_ids)
+        for (i, (id, e)) in enumerate(zip(plant_name_ids, all_entries))
             e.accepted || continue  # synonyms don't carry their own range
-            isempty(e.ipni_id) && continue
-
-            native_range, native_range_codes = get!(range_cache, e.ipni_id) do
-                _fetch_native_range(e.ipni_id; sleep_after = distribution_sleep)
-            end
-
-            if !isempty(native_range)
-                all_entries[i] = ChecklistEntry(e.name, e.author, e.rank, e.family, e.genus_queried,
-                                                 e.accepted, e.accepted_name, e.accepted_author, e.ipni_id,
-                                                 native_range, native_range_codes)
-            end
+            haskey(ranges, id) || continue
+            native_range, native_range_codes = ranges[id]
+            all_entries[i] = ChecklistEntry(e.name, e.author, e.rank, e.family, e.genus_queried,
+                                             e.accepted, e.accepted_name, e.accepted_author, e.ipni_id,
+                                             native_range, native_range_codes)
         end
     end
 
@@ -786,8 +810,14 @@ end
 #
 # # ...and df.native_range_codes holds the same areas as TDWG codes, e.g. "CHC; CHS; TAI"
 #
-# # skip the (slower) per-taxon distribution lookups if you don't need ranges:
+# # skip the native ranges if you don't need them:
 # df = build_checklist("Fagaceae", "Quercus"; include_distribution=false)
+#
+# # WCVP is downloaded the first time build_checklist runs; to update it to Kew's latest release:
+# download_wcvp(force=true)
+#
+# # or keep it somewhere else:
+# df = build_checklist("Fagaceae", "Quercus"; wcvp_dir="data/wcvp")
 #
 # # all the names for an accepted taxon, as (name, author) tuples:
 # checklist_synonyms(df, "Quercus alba")

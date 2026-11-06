@@ -38,6 +38,46 @@ using Test
         end
     end
 
+    @testset "build_checklist (from a tiny fake WCVP)" begin
+        mktempdir() do dir
+            write(joinpath(dir, "wcvp_names.csv"), """
+                plant_name_id|ipni_id|taxon_rank|taxon_status|family|genus|taxon_name|taxon_authors|accepted_plant_name_id|powo_id
+                1|1-1|Genus|Accepted|Fooaceae|Foo|Foo|L.|1|1-1
+                2|2-1|Species|Accepted|Fooaceae|Foo|Foo bar|L.|2|2-1
+                3|3-1|Species|Synonym|Fooaceae|Foo|Foo baz|Smith|2|3-1
+                4|4-1|Species|Synonym|Fooaceae|Foo|Foo qux|Jones|5|4-1
+                5|5-1|Species|Accepted|Fooaceae|Quxia|Quxia qux|(Jones) Lee|5|5-1
+                6|6-1|Species|Misapplied|Fooaceae|Foo|Foo bar|auct.|5|6-1
+                7||Species|Unplaced|Fooaceae|Foo|Foo dubia|Doe||7-4
+                """)
+            write(joinpath(dir, "wcvp_distribution.csv"), """
+                plant_locality_id|plant_name_id|continent_code_l1|continent|region_code_l2|region|area_code_l3|area|introduced|extinct|location_doubtful
+                1|2|8|SOUTHERN AMERICA|85|Southern South America|CLS|Chile South|0|0|0
+                2|2|8|SOUTHERN AMERICA|85|Southern South America|CLC|Chile Central|0|0|0
+                3|2|8|SOUTHERN AMERICA|85|Southern South America|AGW|Argentina Northwest|1|0|0
+                4|2|8|SOUTHERN AMERICA|85|Southern South America|AGS|Argentina South|0|1|0
+                5|5|8|SOUTHERN AMERICA|84|Brazil|BZS|Brazil South|0|0|0
+                """)
+
+            df = build_checklist("Fooaceae", "Foo"; wcvp_dir = dir)
+            @test df.name == ["Foo", "Foo bar", "Foo baz", "Foo dubia", "Foo qux"]  # no misapplied name
+            @test df.accepted == [true, true, false, false, false]
+            @test df.accepted_name == ["", "", "Foo bar", "", "Quxia qux"]
+            @test df.accepted_author[end] == "(Jones) Lee"
+            @test df.ipni_id[2] == "urn:lsid:ipni.org:names:2-1"
+            @test df.native_range[2] == "Chile Central; Chile South"  # introduced & extinct areas left out
+            @test checklist_native_range(df, "Foo bar") == ["CLC", "CLS"]
+            @test checklist_synonyms(df, "Foo bar") == [("Foo bar", "L."), ("Foo baz", "Smith")]
+
+            @test build_checklist("Fooaceae", "Foo"; wcvp_dir = dir, include_synonyms = false).name == ["Foo", "Foo bar"]
+            @test all(isempty, build_checklist("Fooaceae", "Foo"; wcvp_dir = dir, include_distribution = false).native_range)
+            both = build_checklist("Fooaceae", ["Foo", "Quxia", "Foo"]; wcvp_dir = dir)
+            @test unique(both.genus_queried) == ["Foo", "Quxia"]
+            @test nrow(build_checklist("Fooaceae"; wcvp_dir = dir)) == 6
+            @test_throws ArgumentError build_checklist(" "; wcvp_dir = dir)
+        end
+    end
+
     @testset "masks & remove_rows" begin
         df = DataFrame(latitude=[10.0, -5.0, missing, 40.0],
                        longitude=[20.0, 30.0, 0.0, -100.0],

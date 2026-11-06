@@ -2,7 +2,7 @@
 
 A full run for two species of *Calceolaria*, from a name checklist to occurrence
 maps. The code on this page isn't run when the documentation is built (it
-downloads from POWO (or WFO), GBIF & iDigBio), so no output is shown.
+downloads from WCVP (or WFO), GBIF & iDigBio), so no output is shown.
 
 ```julia
 using PlantOccurrences
@@ -23,15 +23,19 @@ final_dir     = "data/pt_occs_final"
 ## 1. Build a checklist
 
 [`build_checklist`](@ref) gets every name in a genus (or genera, or a whole
-family) from POWO: accepted names, their synonyms & each accepted name's native
-range as TDWG botanical countries.
+family) from the World Checklist of Vascular Plants (WCVP, the data behind
+POWO): accepted names, their synonyms & each accepted name's native range as
+TDWG botanical countries.
 
 ```julia
 checklist = build_checklist("Calceolariaceae", "Calceolaria"; output_file="data/calceolaria_checklist.csv")
 ```
 
-Looking up the native ranges takes one request per accepted name, so it's the
-slow part of a large checklist. Use `include_distribution=false` to skip it.
+The first time it's run, it downloads WCVP from Kew (~84 MB, see
+[`download_wcvp`](@ref)) & keeps it, so later checklists are built offline.
+Run `download_wcvp(force=true)` to update to Kew's latest release; the
+`wcvp_downloaded.txt` it writes next to the data says when it was downloaded,
+for citing the version you used.
 
 ### Or: build it from World Flora Online
 
@@ -48,7 +52,7 @@ The rest of this example works the same way with either checklist, except:
   `native_range_codes` columns are empty. [`checklist_native_range`](@ref)
   returns an empty vector, so the `botanicalCountries` in step 7 will be empty
   too & the maps won't show a native range. To get native ranges, use
-  [`build_checklist`](@ref) (POWO).
+  [`build_checklist`](@ref) (WCVP).
 - Its synonyms are the names that point to a taxon in the genus, from any
   genus. Names *in* the genus that are synonyms of taxa in other genera aren't
   included.
@@ -154,7 +158,7 @@ the result on a map before saving anything), [`filter_countries`](@ref) &
 
 The maps need a CSV of the taxa with `scientificName` & `botanicalCountries`
 columns, which is used to draw each taxon's native range under its points
-(the native ranges come from a POWO checklist; with a WFO one,
+(the native ranges come from a WCVP checklist; with a WFO one,
 `botanicalCountries` is empty & no native range is drawn):
 
 ```julia
